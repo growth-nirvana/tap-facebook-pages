@@ -120,9 +120,10 @@ class TapFacebookPages(Tap):
     def discover_streams(self) -> List[Stream]:
         streams = []
         # update page access tokens on sync
-        page_ids = self.config['page_ids']
+        page_ids = self.config.get('page_ids', [])
         self.access_tokens = {}
-        self.partitions = [{"page_id": x} for x in page_ids]
+        self.partitions = [{"page_id": x} for x in page_ids] if page_ids else []
+        
         if self.input_catalog:
             if len(page_ids) > 1:
                 self.get_pages_tokens(page_ids, self.config['access_token'])
