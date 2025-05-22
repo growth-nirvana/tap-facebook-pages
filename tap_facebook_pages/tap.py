@@ -6,6 +6,7 @@ from typing import List, Union
 import requests
 import singer
 from singer_sdk import Tap, Stream
+from singer_sdk import typing as th  # JSON schema typing helpers
 from singer_sdk.typing import (
     ArrayType,
     DateTimeType,
@@ -27,6 +28,7 @@ STREAM_TYPES = [
     PostAttachments,
     PostTaggedProfile,
 ]
+PAGE_ID_TYPE = th.StringType()
 
 FACEBOOK_API_VERSION = "v18.0"
 ACCOUNTS_URL = "https://graph.facebook.com/{version}/{user_id}/accounts"
@@ -43,7 +45,7 @@ class TapFacebookPages(Tap):
 
     config_jsonschema = PropertiesList(
         Property("access_token", StringType, required=True),
-        Property("page_ids", ArrayType(StringType), required=True),
+        Property("page_ids", PAGE_ID_TYPE, required=True, description= "Comma seperated string. Get data for the provided customers only. "),
         Property("start_date", DateTimeType, required=True),
     ).to_dict()
 
@@ -52,7 +54,14 @@ class TapFacebookPages(Tap):
                  parse_env_config: bool = True) -> None:
         super().__init__(config, catalog, state, parse_env_config)
         # update page access tokens on sync
-        page_ids = self.config['page_ids']
+        # page_ids = self.config['page_ids']
+        raw_ids = self.config['page_ids']
+        if isinstance(raw_ids, str):
+            page_ids = [x.strip() for x in raw_ids.split(",") if x.strip()]
+            self.config['page_ids'] = page_ids
+        else:
+            page_ids = raw_ids
+
 
     def exchange_token(self, page_id: str, access_token: str):
         url = BASE_URL.format(page_id=page_id)
