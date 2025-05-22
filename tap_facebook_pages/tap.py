@@ -50,8 +50,9 @@ class TapFacebookPages(Tap):
 
     def __init__(self, config: Union[PurePath, str, dict, None] = None,
                  catalog: Union[PurePath, str, dict, None] = None, state: Union[PurePath, str, dict, None] = None,
-                 parse_env_config: bool = True) -> None:
-        super().__init__(config, catalog, state, parse_env_config)
+                 parse_env_config: bool = True,
+                 **kwargs) -> None:
+        super().__init__(config=config, catalog=catalog, state=state, **kwargs)
         # update page access tokens on sync
         # page_ids = self.config['page_ids']
         raw_ids = self.config['page_ids']
