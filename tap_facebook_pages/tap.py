@@ -54,12 +54,15 @@ class TapFacebookPages(Tap):
         super().__init__(config=config, catalog=catalog, state=state, **kwargs)
         # update page access tokens on sync
         # page_ids = self.config['page_ids']
-        raw_ids = self.config['page_ids']
+        raw_ids = self.config.get('page_ids', [])
         if isinstance(raw_ids, str):
             page_ids = [x.strip() for x in raw_ids.split(",") if x.strip()]
-            self.config['page_ids'] = page_ids
-        else:
+        elif isinstance(raw_ids, list):
             page_ids = raw_ids
+        else:
+            page_ids = []
+        
+        self.page_ids = page_ids
 
 
     def exchange_token(self, page_id: str, access_token: str):
@@ -120,7 +123,7 @@ class TapFacebookPages(Tap):
     def discover_streams(self) -> List[Stream]:
         streams = []
         # update page access tokens on sync
-        page_ids = self.config.get('page_ids', [])
+        page_ids = self.page_ids
         self.access_tokens = {}
         self.partitions = [{"page_id": x} for x in page_ids] if page_ids else []
         
