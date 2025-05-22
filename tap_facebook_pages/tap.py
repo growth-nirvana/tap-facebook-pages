@@ -146,21 +146,24 @@ class TapFacebookPages(Tap):
             stream.access_tokens = self.access_tokens
             streams.append(stream)
         return streams
-
+    
     def load_streams(self) -> List[Stream]:
         stream_objects = self.discover_streams()
         if self.input_catalog:
             selected_streams = []
             catalog = self.input_catalog
-            for stream in catalog.streams:
+            for catalog_entry in catalog.streams:
+                metadata = catalog_entry.metadata
+                # Verifica si el stream está seleccionado en los metadatos
+                if metadata.get('selected', False):
+                    selected_streams.append(catalog_entry.tap_stream_id)
 
-                if stream.is_selected:
-                    selected_streams.append(stream.tap_stream_id)
-
-            stream_objects = [x for x in stream_objects if x.tap_stream_id in selected_streams]
-            for obj in stream_objects:
-                self.logger.info("Found stream: " + obj.tap_stream_id)
+            # Filtra los streams descubiertos para incluir solo los seleccionados
+            stream_objects = [stream for stream in stream_objects if stream.tap_stream_id in selected_streams]
+            for stream in stream_objects:
+                self.logger.info("Found stream: " + stream.tap_stream_id)
         return stream_objects
+
 
 
 # CLI Execution:
