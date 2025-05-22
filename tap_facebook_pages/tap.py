@@ -4,7 +4,7 @@ import logging
 from pathlib import PurePath
 from typing import List, Union
 import requests
-import singer
+
 from singer_sdk import Tap, Stream
 from singer_sdk import typing as th  # JSON schema typing helpers
 from singer_sdk.typing import (
@@ -41,7 +41,6 @@ session = requests.Session()
 class TapFacebookPages(Tap):
     name = PLUGIN_NAME
 
-    _logger = singer.get_logger("FacebookPages")
 
     config_jsonschema = PropertiesList(
         Property("access_token", StringType, required=True),

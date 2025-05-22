@@ -8,6 +8,7 @@ license = "Apache v2"
 [tool.poetry.dependencies]
 
 python = ">=3.8,<3.11"
+pendulum = ">=2.1.0,<3.0.0"
 
 requests = "^2.25.1"
 # Note: Until we clear the first non-prerelease, `singer-sdk` need to be pinned to a specific version.

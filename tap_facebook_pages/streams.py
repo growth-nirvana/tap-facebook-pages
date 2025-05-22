@@ -13,7 +13,6 @@ from singer_sdk.streams import RESTStream
 import backoff
 import functools
 
-import singer
 from singer import metadata
 
 import urllib.parse
