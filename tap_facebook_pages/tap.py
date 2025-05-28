@@ -4,7 +4,7 @@ import logging
 from pathlib import PurePath
 from typing import List, Union
 import requests
-import singer
+
 from singer_sdk import Tap, Stream
 from singer_sdk import typing as th  # JSON schema typing helpers
 from singer_sdk.typing import (
@@ -37,12 +37,17 @@ BASE_URL = "https://graph.facebook.com/{page_id}"
 
 session = requests.Session()
 
+def is_stream_selected(catalog_entry):
+    """Check if a stream is selected based on the Singer SDK 0.3.10 catalog metadata structure."""
+    for breadcrumb, metadata in catalog_entry.metadata.items():
+        if breadcrumb == () and metadata.selected:
+            return True
+    return False
+
 
 class TapFacebookPages(Tap):
     name = PLUGIN_NAME
-
-    _logger = singer.get_logger("FacebookPages")
-
+    
     config_jsonschema = PropertiesList(
         Property("access_token", StringType, required=True),
         Property("page_ids", PAGE_ID_TYPE, required=True, description= "Comma seperated string. Get data for the provided customers only. "),
@@ -51,16 +56,19 @@ class TapFacebookPages(Tap):
 
     def __init__(self, config: Union[PurePath, str, dict, None] = None,
                  catalog: Union[PurePath, str, dict, None] = None, state: Union[PurePath, str, dict, None] = None,
-                 parse_env_config: bool = True) -> None:
-        super().__init__(config, catalog, state, parse_env_config)
+                 **kwargs) -> None:
+        super().__init__(config=config, catalog=catalog, state=state, **kwargs)
         # update page access tokens on sync
         # page_ids = self.config['page_ids']
-        raw_ids = self.config['page_ids']
+        raw_ids = self.config.get('page_ids', [])
         if isinstance(raw_ids, str):
             page_ids = [x.strip() for x in raw_ids.split(",") if x.strip()]
-            self.config['page_ids'] = page_ids
-        else:
+        elif isinstance(raw_ids, list):
             page_ids = raw_ids
+        else:
+            page_ids = []
+        
+        self.page_ids = page_ids
 
 
     def exchange_token(self, page_id: str, access_token: str):
@@ -121,9 +129,10 @@ class TapFacebookPages(Tap):
     def discover_streams(self) -> List[Stream]:
         streams = []
         # update page access tokens on sync
-        page_ids = self.config['page_ids']
+        page_ids = self.page_ids
         self.access_tokens = {}
-        self.partitions = [{"page_id": x} for x in page_ids]
+        self.partitions = [{"page_id": x} for x in page_ids] if page_ids else []
+        
         if self.input_catalog:
             if len(page_ids) > 1:
                 self.get_pages_tokens(page_ids, self.config['access_token'])
@@ -146,18 +155,20 @@ class TapFacebookPages(Tap):
 
     def load_streams(self) -> List[Stream]:
         stream_objects = self.discover_streams()
+    
         if self.input_catalog:
             selected_streams = []
             catalog = self.input_catalog
-            for stream in catalog.streams:
+            for catalog_entry in catalog.streams:
+                if is_stream_selected(catalog_entry):
+                    selected_streams.append(catalog_entry.tap_stream_id)
 
-                if stream.is_selected:
-                    selected_streams.append(stream.tap_stream_id)
-
-            stream_objects = [x for x in stream_objects if x.tap_stream_id in selected_streams]
-            for obj in stream_objects:
-                self.logger.info("Found stream: " + obj.tap_stream_id)
+            stream_objects = [stream for stream in stream_objects if stream.tap_stream_id in selected_streams]
+            for stream in stream_objects:
+                self.logger.info("Found stream: " + stream.tap_stream_id)
+            self.logger.info(f"Selected {len(stream_objects)} streams for sync")
         return stream_objects
+
 
 
 # CLI Execution:
