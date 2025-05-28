@@ -136,6 +136,7 @@ class FacebookPagesStream(RESTStream):
 
         next_page_token: Any = None
         finished = False
+        self.logger.info(f"[{self.name}] Calling API for page: {partition.get('page_id') if partition else 'N/A'}")
         while not finished:
             prepared_request = self.prepare_request(
                 partition, next_page_token=next_page_token
@@ -176,14 +177,28 @@ class FacebookPagesStream(RESTStream):
 
     def get_url_params(self, partition: Optional[dict], next_page_token: Optional[Any] = None) -> Dict[str, Any]:
         self.page_id = partition["page_id"]
+        self.logger.info(f"[DEBUG] Partition passed to get_starting_timestamp: {partition}")
+
+
         if next_page_token:
             return urllib.parse.parse_qs(urllib.parse.urlparse(next_page_token).query)
 
         params = {}
+
+        # Always try to get starting timestamp
         starting_datetime = self.get_starting_timestamp(partition)
+
+        # Fallback to config['start_date'] if needed
+        if not starting_datetime and "start_date" in self.config:
+            self.logger.info("[DEBUG] Falling back to config['start_date']")
+            starting_datetime = pendulum.parse(self.config["start_date"])
+
         if starting_datetime:
             start_date_timestamp = int(starting_datetime.timestamp())
             params.update({"since": start_date_timestamp})
+        else:
+            self.logger.warning("[WARN] No starting timestamp or start_date found — 'since' will not be set.")
+
 
         if partition["page_id"] in self.access_tokens:
             params.update({"access_token": self.access_tokens[partition["page_id"]]})
@@ -352,6 +367,7 @@ class Posts(FacebookPagesStream):
 
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
         resp_json = response.json()
+        self.logger.info(f"[Posts] Response contains {len(resp_json.get('data', []))} items")
         for row in resp_json["data"]:
             row["page_id"] = self.page_id
             yield row
@@ -371,6 +387,7 @@ class PostTaggedProfile(FacebookPagesStream):
             params = super().get_url_params(partition, next_page_token)
         else:
             params = next_page_token
+
         time = int(t.time()) + 86400  # add one day to the last until time
         day = int(datetime.timedelta(1).total_seconds())
         if not next_page_token:
@@ -424,6 +441,7 @@ class PostAttachments(FacebookPagesStream):
             params = super().get_url_params(partition, next_page_token)
         else:
             params = next_page_token
+
         time = int(t.time()) + 86400  # add one day to the last until time
         day = int(datetime.timedelta(1).total_seconds())
         if not next_page_token:
@@ -483,6 +501,8 @@ class PageInsights(FacebookPagesStream):
             params = super().get_url_params(partition, next_page_token)
         else:
             params = next_page_token
+
+
         time = int(t.time()) + 86400  # add one day to the last until time
         day = int(datetime.timedelta(1).total_seconds())
         if not next_page_token:
@@ -549,6 +569,8 @@ class PostInsights(FacebookPagesStream):
             params = super().get_url_params(partition, next_page_token)
         else:
             params = next_page_token
+
+
         time = int(t.time()) + 86400  # add one day to the last until time
         day = int(datetime.timedelta(1).total_seconds())
         if not next_page_token:

@@ -37,11 +37,17 @@ BASE_URL = "https://graph.facebook.com/{page_id}"
 
 session = requests.Session()
 
+def is_stream_selected(catalog_entry):
+    """Check if a stream is selected based on the Singer SDK 0.3.10 catalog metadata structure."""
+    for breadcrumb, metadata in catalog_entry.metadata.items():
+        if breadcrumb == () and metadata.selected:
+            return True
+    return False
+
 
 class TapFacebookPages(Tap):
     name = PLUGIN_NAME
-
-
+    
     config_jsonschema = PropertiesList(
         Property("access_token", StringType, required=True),
         Property("page_ids", PAGE_ID_TYPE, required=True, description= "Comma seperated string. Get data for the provided customers only. "),
@@ -146,22 +152,21 @@ class TapFacebookPages(Tap):
             stream.access_tokens = self.access_tokens
             streams.append(stream)
         return streams
-    
+
     def load_streams(self) -> List[Stream]:
         stream_objects = self.discover_streams()
+    
         if self.input_catalog:
             selected_streams = []
             catalog = self.input_catalog
             for catalog_entry in catalog.streams:
-                metadata = catalog_entry.metadata
-                # Verifica si el stream está seleccionado en los metadatos
-                if metadata.get('selected', False):
+                if is_stream_selected(catalog_entry):
                     selected_streams.append(catalog_entry.tap_stream_id)
 
-            # Filtra los streams descubiertos para incluir solo los seleccionados
             stream_objects = [stream for stream in stream_objects if stream.tap_stream_id in selected_streams]
             for stream in stream_objects:
                 self.logger.info("Found stream: " + stream.tap_stream_id)
+            self.logger.info(f"Selected {len(stream_objects)} streams for sync")
         return stream_objects
 
 
